@@ -42,7 +42,7 @@ def speak(data):
       bbot.speak('Hey! How are you %s?' % atName(name))
    if re.match('(.+)?( have )?(.)?/round( )?of( )?beer(s)?',text.lower()):
       bbot.speak('Round of %d beers coming right up! Hold on just a minute!' % (len(userList)-1))
-      beerTmr = threading.Timer(random.randint(7,20),serveBeers)
+      beerTmr = threading.Timer(random.randint(7,20),serveBeers) # We wait for a random amount of 7-20 seconds to "fill" the beers
       beerTmr.start()
    if re.match('/beer(( )?me)?',text.lower()):
       bbot.speak('%s *gives a :beer: to %s*' % (beerme[random.randint(0,len(beerme)-1)].replace('/name',atName(name)),atName(name)))
@@ -57,7 +57,7 @@ def userReg(data):
    print '%s  %s has entered the room. %s' % (strftime('%I:%M:%S %p',localtime()),name,userid)
    if strftime('%w',localtime()) == '3':
       if len(welcList)==0 and not(userid == bumbot_userid):
-         wTmr = threading.Timer(5,welcomeUsers) #Welcome users
+         wTmr = threading.Timer(5,welcomeUsers) #Welcome users wait 5 seconds to welcome
          wTmr.start()
       if not(userid == bumbot_userid):
          welcList.append(atName(name))
@@ -70,7 +70,7 @@ def serveBeers():
 
 def welcomeUsers():
    global welcList,userList
-   bbot.speak('Hey, %s, have a cold one on the house :beer:' % ', '.join(welcList))
+   bbot.speak('Hey, %s, have a cold one on the house :beer:' % ', '.join(welcList)) # We can welcome 2 people at once if they come within the same 5 secs
    welcList = []
 
 def roomChanged(data):
