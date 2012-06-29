@@ -51,16 +51,22 @@ def speak(data):
 
 
 def userReg(data):
-   global welcList
+   global welcList,bbot_
    userid = data['user'][0]['userid']
    name   = data['user'][0]['name']
    print '%s  %s has entered the room. %s' % (strftime('%I:%M:%S %p',localtime()),name,userid)
-   if strftime('%w',localtime()) == '3':
+   if strftime('%w',localtime()) == '3' or (strftime('%w',localtime())==4 and int(strftime('%H',localtime()))<6):
       if len(welcList)==0 and not(userid == bumbot_userid):
          wTmr = threading.Timer(5,welcomeUsers) #Welcome users wait 5 seconds to welcome
          wTmr.start()
       if not(userid == bumbot_userid):
          welcList.append(atName(name))
+   else:
+      def getMods(data):
+         if not(userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
+            bbot.speak('Booting...')
+            bbot.bootUser(userid,'Sorry man, the speakeasy isn\'t open right now and this is where I sleep.')
+      bbot.roomInfo(getMods)
    if not(userid == bumbot_userid):
       userList.append({'name':data['user'][0]['name'],'userid':data['user'][0]['userid'],'avatarid':data['user'][0]['avatarid']})
 
@@ -86,6 +92,9 @@ def roomChanged(data):
       if userList[i]['userid'] in data['room']['metadata']['djs']:
          print strpAcc(userList[i]['name'])
    print '\n'
+   for i in range(len(userList)):
+      if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
+         bbot.bootUser(userList[i]['userid'],'Sorry man, the speakeasy isn\'t open right now and this is where I sleep.')
 
 def newSong(data):
    global snags
