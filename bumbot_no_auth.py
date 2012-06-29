@@ -51,7 +51,7 @@ def speak(data):
 
 
 def userReg(data):
-   global welcList,bbot_
+   global welcList
    userid = data['user'][0]['userid']
    name   = data['user'][0]['name']
    print '%s  %s has entered the room. %s' % (strftime('%I:%M:%S %p',localtime()),name,userid)
