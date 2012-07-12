@@ -33,6 +33,8 @@ bl.close()
 welcList = [] # Welcome list
 userList = []
 snags = 0
+voteScore = 50
+alreadyVoted = 0
 songData = {}
 closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays) and this is where I sleep.'
 
@@ -42,15 +44,44 @@ avatars = [{'id':1,'desc':'Brunette girl'},{'id':2,'desc':'Green-haired girl'},{
 beerme = ['Ok /name, I\'ll add it to your tab.','Of course!','Coming right up! Here you go!','Whoah there /name, slow down with the drinks there! I\'ll give you one for now though.','Sure, but when are you going to hand over the dough, /name?','Ok, just don\'t make eyes to the bull!','Trying to get an edge are ya?','Gettin a bit spifflicated are ya?','Ok, /name, just warning you, you have to clean the upchuck!']
 
 def speak(data):
-   global userList,beerme,songData,banlistDir,banlist
+   global userList,beerme,songData,banlistDir,banlist,voteScore,alreadyVoted
    name = data['name']
    userid = data['userid']
    text = data['text']
    userid = data['userid']
+   if re.match('/commands',text.lower()):
+      bbot.speak(u'Current commands: /hey, /roundofbeers, /beer, /menu, /banlist, /coverart, /album, /genre, /bop (score > or = 60%), /lame (score < or = 45%) Mods: BumBot ban *username*, BumBot unban *username*')
+      
+   if re.match('/bo(p|b)',text.lower()):
+      if not(alreadyVoted == 1 or alreadyVoted == -1):
+         if userid != songData['djid']:
+            if voteScore >= 60.0:
+               bbot.vote('up')
+               alreadyVoted = 1
+            else:
+               bbot.speak('You\'re gonna need the audience to back you up a bit more.')
+         else:
+            bbot.speak('You can\'t awesome your own song!')
+      else:
+         if alreadyVoted == 1:
+            bbot.vote('up')
+         bbot.speak('I already voted!')
+            
+   if re.match('/lame',text.lower()):
+      if not(alreadyVoted == 1 or alreadyVoted == -1):
+         if voteScore <= 45.0:
+            bbot.vote('down')
+            alreadyVoted = -1
+         else:
+            bbot.speak('You\'re gonna need the audience to back you up a bit more.')
+      else:
+         if alreadyVoted == -1:
+            bbot.vote('down')         
+         bbot.speak('I already voted!')
 
    if re.match('/((h(ello|i|ey))|(sup))', strpAcc(text)):
       bbot.speak('Hey! How are you %s?' % atName(name))
-   if re.match('(.+)?( have )?(.)?/round( )?of( )?beer(s)?',text.lower()):
+   if re.match('/round( )?of( )?beer(s)?',text.lower()):
       bbot.speak('Round of %d beers coming right up! Hold on just a minute!' % (len(userList)-1))
       beerTmr = threading.Timer(random.randint(7,20),serveBeers)
       beerTmr.start()
@@ -84,49 +115,52 @@ def speak(data):
       def checkMod(data):
          if userid in data['room']['metadata']['moderator_id']:
             def getId(userdata):
-                     if userdata['success']:
-                        if userdata['userid'] in data['room']['metadata']['moderator_id']:
-                              bbot.speak("I can't ban mods!")
-                        else:
-                              bbot.bootUser(userdata['userid'],'You have been banned by %s!' % name)
-                              def getName(namedata):
-                                 global banlistDir
-                                 banlist.append({'userid':userdata['userid'],'name':namedata['name']})
-                                 bl = open(banlistDir,'w')
-                                 pickle.dump(banlist,bl)
-                                 bl.close()
-                                 print 'Wrote new banlist: %s' % str(banlist)
-                                 bbot.speak('Banned %s!' % namedata['name'])
-                              bbot.getProfile(userdata['userid'],getName)
-                     else:
-                        bbot.speak("I couldn't find the user!")
+               if userdata['success']:
+                  if userdata['userid'] in data['room']['metadata']['moderator_id']:
+                     bbot.speak("I can't ban mods!")
+                  else:
+                     bbot.bootUser(userdata['userid'],'You have been banned by %s!' % name)
+                     def getName(namedata):
+                        global banlistDir
+                        banlist.append({'userid':userdata['userid'],'name':namedata['name']})
+                        bl = open(banlistDir,'w')
+                        pickle.dump(banlist,bl)
+                        bl.close()
+                        print 'Wrote new banlist: %s' % str(banlist)
+                        bbot.speak('Banned %s!' % namedata['name'])
+                     bbot.getProfile(userdata['userid'],getName)
+               else:
+                  bbot.speak("I couldn't find the user!")
             bbot.getUserId(text[11:],getId)
       bbot.roomInfo(False,checkMod)
 
    if re.match('bumbot unban (.+)',text.lower()):
       def checkMod(data):
-            if userid in data['room']['metadata']['moderator_id']:
-               beginLen = len(banlist)
-               for i in range(len(banlist)):
-                  if banlist[i]['name'].lower()==text[13:].lower():
-                        bbot.speak('Unbanned %s.' % banlist[i]['name'])
-                        banlist.remove(banlist[i]) #remove that current value
-                        global banlistDir
-                        bl = open(banlistDir,'w')
-                        pickle.dump(banlist,bl)
-                        bl.close()
-                        print 'Wrote new banlist: %s' % str(banlist)                        
-                        break
-               if beginLen-1 != len(banlist):
-                  bbot.speak('Couldn\'t remove the user from the ban list.')
+         if userid in data['room']['metadata']['moderator_id']:
+            beginLen = len(banlist)
+            for i in range(len(banlist)):
+               if banlist[i]['name'].lower()==text[13:].lower():
+                  bbot.speak('Unbanned %s.' % banlist[i]['name'])
+                  banlist.remove(banlist[i]) #remove that current value
+                  global banlistDir
+                  bl = open(banlistDir,'w')
+                  pickle.dump(banlist,bl)
+                  bl.close()
+                  print 'Wrote new banlist: %s' % str(banlist)                        
+                  break
+            if beginLen-1 != len(banlist):
+               bbot.speak('Couldn\'t remove the user from the ban list.')
       bbot.roomInfo(False,checkMod)
       
    print(strftime('%I:%M:%S %p',localtime())+'  '+strpAcc(name) + ':'+ ' '*(21-len(strpAcc(name)))+ strpAcc(text))
          
 def newSong(data):
-   global snags,songData
+   global snags,songData,voteScore,alreadyVoted
    snags = 0
+   voteScore = 50
+   alreadyVoted = 0
    songData = data['room']['metadata']['current_song']
+   songData['djid'] = data['room']['metadata']['current_dj']
 
 def userReg(data):
    global welcList,bbot_
@@ -142,7 +176,6 @@ def userReg(data):
    else:
       def getMods(data):
          if not(userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
-            bbot.speak('Booting...')
             bbot.bootUser(userid,closedMsg)
       bbot.roomInfo(getMods)
    if not(userid == bumbot_userid):
@@ -175,6 +208,7 @@ def roomChanged(data):
          if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
             bbot.bootUser(userList[i]['userid'],closedMsg)
    newSong(data)
+   updateVotes(data)
 
 def userDereg(data):
    userid = data['user'][0]['userid']
@@ -182,11 +216,19 @@ def userDereg(data):
    print '%s  %s has left the room. %s' % (strftime('%I:%M:%S %p',localtime()),strpAcc(name),userid)
    for i in range(len(userList)):
       if userList[i]['userid']==userid: userList.remove(userList[i])
-      
+
+def updateVotes(data):
+   global voteScore
+   up = float(data['room']['metadata']['upvotes'])
+   down = float(data['room']['metadata']['downvotes'])
+   listeners = float(data['room']['metadata']['listeners'])
+   voteScore = 50*(1+(up-down)/listeners)
+   print voteScore
+
 def songEnd(data):
    global snags
    md = data['room']['metadata']
-   bbot.speak(numEmote('%d:arrow_up: %d:arrow_down: %d:heart:' % (int(md['upvotes']),int(md['downvotes']),int(snags))))
+   bbot.speak(numEmote('"%s": %s:arrow_up: %s:arrow_down: %s:heart:' % (md['current_song']['metadata']['song'],str(md['upvotes']),str(md['downvotes']),str(snags))))
    
 def atName(name):
    if name[0]=='@':
@@ -205,7 +247,7 @@ def numEmote(s):
    return s.replace('0',':zero:').replace('1',':one:').replace('2',':two:').replace('3',':three:').replace('4',':four:').replace('5',':five:').replace('6',':six:').replace('7',':seven:').replace('8',':eight:').replace('9',':nine:')
 
 def roomOpen():
-   return strftime('%w',localtime()) == '3' or (strftime('%w',localtime())==4 and int(strftime('%H',localtime()))<6)
+   return strftime('%w',localtime()) == '3' or (int(strftime('%w',localtime()))==4 and int(strftime('%H',localtime()))<6)
 
 bbot.on('newsong',newSong)
 bbot.on('snagged',recSnag)
@@ -215,4 +257,5 @@ bbot.on('deregistered',userDereg)
 bbot.on('speak',speak)
 bbot.on('roomChanged',roomChanged)
 bbot.on('registered',userReg)
+bbot.on('update_votes',updateVotes)
 bbot.start()
