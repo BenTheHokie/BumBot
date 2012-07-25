@@ -41,7 +41,9 @@ closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays)
 
 avatars = [{'id':1,'desc':'Brunette girl'},{'id':2,'desc':'Green-haired girl'},{'id':3,'desc':'Red hair pigtails'},{'id':4,'desc':'Blonde chick'},{'id':5,'desc':'Brown mohawk guy'},{'id':6,'desc':'Light brown pigtails'},{'id':7,'desc':'Light brown haired guy'},{'id':8,'desc':'Ginger'},{'id':34,'desc':'African-American kid'},{'id':9,'desc':'Brown bear'},{'id':10,'desc':'Voodoo/Acupuncture bear'},{'id':12,'desc':'Alien bear'},{'id':13,'desc':'Aquamarine bear'},{'id':14,'desc':'Purple bear'},{'id':15,'desc':'Orange bear'},{'id':16,'desc':'Goth bear'},{'id':17,'desc':'Blue bear'},{'id':18,'desc':'Gray mouse/cat'},{'id':19,'desc':'Green mouse/cat'},{'id':121,'desc':'Pink mouse/cat'},{'id':20,'desc':'Blonde superhero'},{'id':21,'desc':'Pink haired superhero'},{'id':22,'desc':'Viking/Devil'},{'id':23,'desc':'Gorilla'},{'id':36,'desc':'Butler monkey'},{'id':37,'desc':'Pink monkey'},{'id':27,'desc':'Ginger space man'},{'id':28,'desc':'Blue-eyed space man'},{'id':29,'desc':'Green glasses space man'},{'id':30,'desc':'Brown haired space kid'},{'id':31,'desc':'African-American space man'},{'id':32,'desc':'Black haired space kid'},{'id':33,'desc':'Blonde space kid'},{'id':218,'desc':'Pink space monkey'},{'id':219,'desc':'Purple space monkey'},{'id':220,'desc':'Red space monkey'},{'id':221,'desc':'Yellow space monkey'},{'id':222,'desc':'Blue alien'},{'id':223,'desc':'Pink alien chick'},{'id':224,'desc':'Green bearded alien'},{'id':225,'desc':'Green monocle alien'},{'id':226,'desc':'Green alien pink hair chick'},{'id':227,'desc':'Ginger alien chick'},{'id':228,'desc':'Purple monocle alien'},{'id':229,'desc':'Purple bearded alien'},{'id':230,'desc':'Redhead chick alien with hat'},{'id':26,'desc':'Superuser robo helmet'},{'id':35,'desc':'Superuser rainbow helmet'},{'id':58,'desc':'Wooooo'}]
 
-beerme = ['Ok /name, I\'ll add it to your tab.','Of course!','Coming right up! Here you go!','Whoah there /name, slow down with the drinks there! I\'ll give you one for now though.','Sure, but when are you going to hand over the dough, /name?','Ok, just don\'t make eyes to the bull!','Trying to get an edge are ya?','Gettin a bit spifflicated are ya?','Ok, /name, just warning you, you have to clean the upchuck!']
+beerme = ['Ok /name, I\'ll add it to your tab.','Of course!','Coming right up! Here you go!','Whoah there /name, slow down with the drinks there! I\'ll give you one for now though.','Sure, but when are you going to hand over the dough, /name?','Ok, just don\'t make eyes to the bull!','Trying to get an edge are ya?','Gettin a bit spifflicated are ya?','Ok, /name, just warning you, you have to clean the upchuck!','Ok, /name just be sure you don\'t handle any of them wooden nickels.']
+
+welcomeDrinks = ['Hi /name, have a nice glass \'o gin imported from Canada :beer:','/name, welcome! Here some of our very own gin from out back! :beer:','Hey! /name, you\'re not allowed here! Beat it! Just joking. Everything is Jake. Have a nice glass of our very own giggle water. :beer:','Oh /name, the big cheese, @babyshoe, has been brewing up something special for us this week. Lemme pull out a glass of that stuff. :beer:','We got this one from straight across the Atlantic. /name, here\'s one special for you. :beer:','Hey /name, straight from out the back. Here, have one. :beer:','/name, one glass of moonshine for you! :beer:','/name, you look a bit spifflicated coming in here. Well that\'s alright. Have another. :beer:','Our finest bathtub gin on the house for this fine citizen, /name. Cheers! :beer:']
 
 def speak(data):
    global userList,beerme,songData,banlistDir,banlist,voteScore,alreadyVoted
@@ -88,7 +90,7 @@ def speak(data):
    if re.match('/beer(( )?me)?',text.lower()):
       bbot.speak('%s *gives a :beer: to %s*' % (beerme[random.randint(0,len(beerme)-1)].replace('/name',atName(name)),atName(name)))
    if re.match('/menu(.+)?',text.lower()):
-      bbot.speak('Here\'s our menu: :beer::cocktail::sake::coffee::hamburger::spaghetti::ramen::cake::icecream::apple::watermelon::eggplant:')
+      bbot.speak('Here\'s our menu: :beer::cocktail::sake::coffee::hamburger::spaghetti::ramen::cake::icecream::apple::watermelon::eggplant: and we also have shirley temples for those of you non-drinkers. Lemonade is reserved for the raids.')
 
    if re.match('/ban( )?list',text.lower()):
       nameBans = []
@@ -162,6 +164,14 @@ def newSong(data):
    songData = data['room']['metadata']['current_song']
    songData['djid'] = data['room']['metadata']['current_dj']
 
+def pmReply(data):
+   text = data['text']
+   userid = data['senderid']
+   if userid == lsk_userid:
+      if text.lower() == 'unicode':
+         print 'Unicode speak test'
+         bbot.speak(u'\u25B2 \u25BC \u2764')
+
 def userReg(data):
    global welcList,bbot_
    userid = data['user'][0]['userid']
@@ -223,12 +233,12 @@ def updateVotes(data):
    down = float(data['room']['metadata']['downvotes'])
    listeners = float(data['room']['metadata']['listeners'])
    voteScore = 50*(1+(up-down)/listeners)
-   print voteScore
+   #print voteScore
 
 def songEnd(data):
    global snags
    md = data['room']['metadata']
-   bbot.speak(numEmote('"%s": %s:arrow_up: %s:arrow_down: %s:heart:' % (md['current_song']['metadata']['song'],str(md['upvotes']),str(md['downvotes']),str(snags))))
+   bbot.speak(u'"%s": %s\u25B2, %s\u25BC, %s\u2764' % (md['current_song']['metadata']['song'],str(md['upvotes']),str(md['downvotes']),str(snags)))
    
 def atName(name):
    if name[0]=='@':
@@ -249,6 +259,7 @@ def numEmote(s):
 def roomOpen():
    return strftime('%w',localtime()) == '3' or (int(strftime('%w',localtime()))==4 and int(strftime('%H',localtime()))<6)
 
+bbot.on('pmmed',pmReply)
 bbot.on('newsong',newSong)
 bbot.on('snagged',recSnag)
 bbot.on('newsong',newSong)
