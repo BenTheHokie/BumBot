@@ -1,6 +1,6 @@
-#BumBot v1 This bot's account was taken from Backup Ref since CTS didn't want the bot.
+#BumBot v3 This bot's account was taken from Backup Ref since CTS didn't want the bot.
 
-from ttapi import Bot
+from ttapi_with_stop import Bot
 from printnesteddictionary import print_dict
 import re
 import random
@@ -36,6 +36,7 @@ snags = 0
 voteScore = 50
 alreadyVoted = 0
 songData = {}
+djList = []
 closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays) and this is where I sleep.'
 
 
@@ -154,7 +155,7 @@ def speak(data):
                bbot.speak('Couldn\'t remove the user from the ban list.')
       bbot.roomInfo(False,checkMod)
       
-   print(strftime('%I:%M:%S %p',localtime())+'  '+strpAcc(name) + ':'+ ' '*(21-len(strpAcc(name)))+ strpAcc(text))
+   print(strLT()+'  '+strpAcc(name) + ':'+ ' '*(21-len(strpAcc(name)))+ strpAcc(text))
          
 def newSong(data):
    global snags,songData,voteScore,alreadyVoted
@@ -162,6 +163,7 @@ def newSong(data):
    voteScore = 50
    alreadyVoted = 0
    songData = data['room']['metadata']['current_song']
+   print '%s  %s started playing "%s" by %s' % (strLT(),strpAcc(songData['djname']),strpAcc(songData['metadata']['song']),strpAcc(songData['metadata']['artist']))
    songData['djid'] = data['room']['metadata']['current_dj']
 
 def pmReply(data):
@@ -171,12 +173,24 @@ def pmReply(data):
       if text.lower() == 'unicode':
          print 'Unicode speak test'
          bbot.speak(u'\u25B2 \u25BC \u2764')
-
+      if re.match('/say (.+)',text.lower()):
+         bbot.speak(text[5:])
+      if text.lower()=='dj on':
+         bbot.addDj()
+      if text.lower()=='dj off':
+         bbot.remDj()
+      if re.match('dj( )?list',text.lower()):
+         print djList
+      if text.lower()=='stop':
+         bbot.stop()
+      if text.lower()=='restart':
+         restartWait()
+         
 def userReg(data):
-   global welcList,bbot_
+   global welcList
    userid = data['user'][0]['userid']
    name   = data['user'][0]['name']
-   print '%s  %s has entered the room. %s' % (strftime('%I:%M:%S %p',localtime()),name,userid)
+   print '%s  %s has entered the room. %s' % (strLT(),name,userid)
    if roomOpen():
       if len(welcList)==0 and not(userid == bumbot_userid):
          wTmr = threading.Timer(5,welcomeUsers) #Welcome users
@@ -189,7 +203,40 @@ def userReg(data):
             bbot.bootUser(userid,closedMsg)
       bbot.roomInfo(getMods)
    if not(userid == bumbot_userid):
-      userList.append({'name':data['user'][0]['name'],'userid':data['user'][0]['userid'],'avatarid':data['user'][0]['avatarid']})
+      userList.append({'name':data['user'][0]['name'],'userid':data['user'][0]['userid'],'avatarid':data['user'][0]['avatarid'],'laptop':data['user'][0]['laptop']})
+      
+def addedDj(data):
+   global djList
+   user = data['user'][0]
+   djList.append({'name':user['name'],'userid':user['userid'],'avatarid':user['avatarid'],'laptop':user['laptop']})
+   print '%s  %s has jumped on the DJ stand.' % (strLT(),strpAcc(user['name']))
+   botIsDj = False
+   for i in range(len(djList)):
+      if bumbot_userid==djList[i]['userid']:
+         botIsDj = True
+         break
+   if len(djList)==1 and not(botIsDj):
+      bbot.addDj()
+   if len(djList)==3 and botIsDj:
+      bbot.remDj()   
+   
+def removedDj(data):
+   global djList
+   for i in range(len(djList)):
+      if data['user'][0]['userid']==djList[i]['userid']:
+         print '%s  %s has jumped off the DJ stand.' % (strLT(),strpAcc(data['user'][0]['name'])) 
+         djList.remove(djList[i])
+         break
+   botIsDj = False
+   for i in range(len(djList)):
+      if bumbot_userid==djList[i]['userid']:
+         botIsDj = True
+         break
+   if (len(djList)==1) and not(botIsDj):
+      bbot.addDj()
+   if (len(djList)==1) and botIsDj:
+      bbot.remDj()
+
 
 def serveBeers():
    global userList
@@ -199,21 +246,26 @@ def welcomeUsers():
    global welcList,userList
    bbot.speak('Hey, %s, have a cold one on the house :beer:' % ', '.join(welcList))
    welcList = []
-
+   
 def roomChanged(data):
    print 'Moderators:      %s' % (', '.join(data['room']['metadata']['moderator_id']))
-   global userList
+   global userList,djList
    for i in range(len(data['users'])):
-      userList.append({'name':data['users'][i]['name'],'userid':data['users'][i]['userid'],'avatarid':data['users'][i]['avatarid']})
+      userList.append({'name':data['users'][i]['name'],'userid':data['users'][i]['userid'],'avatarid':data['users'][i]['avatarid'],'laptop':data['users'][i]['laptop']})
    print '\nCurrent Users:'
    for i in range(len(userList)):
       print(strpAcc(userList[i]['name'])+ ' '*(30-len(strpAcc(userList[i]['name']))) + userList[i]['userid']) #when we enter the room we print the current users in the I/O
    print '\nCurrent DJs:'
-   for i in range(len(userList)):
-      if userList[i]['userid'] in data['room']['metadata']['djs']:
-         print strpAcc(userList[i]['name'])
+   djIds = data['room']['metadata']['djs']
+   for i in range(len(djIds)):
+      for k in range(len(userList)):
+         if djIds[i]==userList[k]['userid']:
+            djList.append(userList[k])
+            print userList[k]['name']
    print '\n'
-   if roomOpen():
+   if len(djList)==1:
+      bbot.addDj()     
+   if not(roomOpen()):
       for i in range(len(userList)):
          if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
             bbot.bootUser(userList[i]['userid'],closedMsg)
@@ -223,7 +275,7 @@ def roomChanged(data):
 def userDereg(data):
    userid = data['user'][0]['userid']
    name   = data['user'][0]['name']
-   print '%s  %s has left the room. %s' % (strftime('%I:%M:%S %p',localtime()),strpAcc(name),userid)
+   print '%s  %s has left the room. %s' % (strLT(),strpAcc(name),userid)
    for i in range(len(userList)):
       if userList[i]['userid']==userid: userList.remove(userList[i])
 
@@ -253,20 +305,55 @@ def recSnag(data):
 def strpAcc(s):
    return ''.join((c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn'))
 
+def uniDesc(s):
+   s=unicode(s)
+   for i in range(len(s)):
+      if ord(s[i])>=128:
+         s.replace(s[i],'?')
+   return s
+
 def numEmote(s):
    return s.replace('0',':zero:').replace('1',':one:').replace('2',':two:').replace('3',':three:').replace('4',':four:').replace('5',':five:').replace('6',':six:').replace('7',':seven:').replace('8',':eight:').replace('9',':nine:')
 
 def roomOpen():
    return strftime('%w',localtime()) == '3' or (int(strftime('%w',localtime()))==4 and int(strftime('%H',localtime()))<6)
 
+def strLT(): #string local time
+   return strftime('%I:%M:%S %p',localtime())
+   
+def restartWait(retryTime=60):
+   threading.Timer(retryTime,restartBegin).start()
+   try:
+      bbot.stop()
+   except AttributeError, err:
+      pass # If we get an AttributeError, that just means that we weren't able to close an already closed websocket
+   print '%s  BOT DISCONNECTED... BOT WILL TRY TO RECONNECT IN %s SECONDS...' % (strLT(),str(retryTime))
+   
+def restartBegin():
+   global djList,userList
+   userList = []
+   djList   = []   
+   print '%s  ATTEMPTING TO RECONNECT...\n' % strLT()
+   try:
+      bbot.connect(speakeasy_id)
+      bbot.start()
+      bbot.updatePresTmr()
+   except (AttributeError, URLError):
+      disconnect()
+
+def disconnect(data=None):
+   restartWait()
+
+bbot.on('rem_dj',removedDj)
+bbot.on('add_dj',addedDj)
 bbot.on('pmmed',pmReply)
 bbot.on('newsong',newSong)
 bbot.on('snagged',recSnag)
-bbot.on('newsong',newSong)
 bbot.on('endsong',songEnd)
 bbot.on('deregistered',userDereg)
 bbot.on('speak',speak)
 bbot.on('roomChanged',roomChanged)
 bbot.on('registered',userReg)
 bbot.on('update_votes',updateVotes)
+bbot.on('disconnect',disconnect)
 bbot.start()
