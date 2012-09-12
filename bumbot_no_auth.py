@@ -10,6 +10,7 @@ import os
 import unicodedata
 import threading
 import pickle
+from datetime import *
 
 bumbot_auth       = 'auth+live+xxxxxxxx'
 bumbot_userid     = '4fdca143aaa5cd1e79000315'
@@ -37,6 +38,10 @@ voteScore = 50
 alreadyVoted = 0
 songData = {}
 djList = []
+botPl=[]
+addedSong=False
+songId=''
+songData={}
 closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays) and this is where I sleep.'
 
 
@@ -81,7 +86,11 @@ def speak(data):
          if alreadyVoted == -1:
             bbot.vote('down')         
          bbot.speak('I already voted!')
-
+   if text.lower() == '/add':
+      def checkMod(data):
+         if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
+            addSnag()
+      bbot.roomInfo(False,checkMod)
    if re.match('/((h(ello|i|ey))|(sup))', strpAcc(text)):
       bbot.speak('Hey! How are you %s?' % atName(name))
    if re.match('/round( )?of( )?beer(s)?',text.lower()):
@@ -158,7 +167,8 @@ def speak(data):
    print(strLT()+'  '+strpAcc(name) + ':'+ ' '*(21-len(strpAcc(name)))+ strpAcc(text))
          
 def newSong(data):
-   global snags,songData,voteScore,alreadyVoted
+   global snags,songData,voteScore,alreadyVoted,addedSong
+   addedSong=False
    snags = 0
    voteScore = 50
    alreadyVoted = 0
@@ -169,6 +179,26 @@ def newSong(data):
 def pmReply(data):
    text = data['text']
    userid = data['senderid']
+   global alreadyVoted,songData
+   if re.match('/bo(p|b)',text.lower()):
+      if not(alreadyVoted == 1 or alreadyVoted == -1):
+         if userid != songData['djid']:
+            if voteScore >= 60.0:
+               bbot.vote('up')
+               alreadyVoted = 1
+            else:
+               bbot.pm('You\'re gonna need the audience to back you up a bit more.',userid)
+         else:
+            bbot.pm('You can\'t awesome your own song!',userid)
+      else:
+         if alreadyVoted == 1:
+            bbot.vote('up')
+         bbot.pm('I already voted!',userid)
+   if text.lower() == '/add':
+      def checkMod(data):
+         if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
+            addSnag(False)
+      bbot.roomInfo(False,checkMod)   
    if userid == lsk_userid:
       if text.lower() == 'unicode':
          print 'Unicode speak test'
@@ -191,7 +221,12 @@ def userReg(data):
    userid = data['user'][0]['userid']
    name   = data['user'][0]['name']
    print '%s  %s has entered the room. %s' % (strLT(),name,userid)
-   if roomOpen():
+   if not(date.today()>=date(2012,9,12)):
+      def getMods(data):
+         if not(userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
+            bbot.bootUser(userid,"THE SPEAKEASY HAS BEEN RAIDED! The bulls are everywhere so we've halted all our shipments until September the 12th and we'd love to see you back then! \n\nThere is more information here: http://goo.gl/Jo0f1")
+      bbot.roomInfo(getMods)
+   elif roomOpen():
       if len(welcList)==0 and not(userid == bumbot_userid):
          wTmr = threading.Timer(5,welcomeUsers) #Welcome users
          wTmr.start()
@@ -244,7 +279,10 @@ def serveBeers():
 
 def welcomeUsers():
    global welcList,userList
-   bbot.speak('Hey, %s, have a cold one on the house :beer:' % ', '.join(welcList))
+   if date.today()==date(2012,9,12):
+      bbot.speak('Our latest shipment has arrived! :balloon::balloon: %s, have a cold one on us! :beer:' % ', '.join(welcList))
+   else:
+      bbot.speak('Hey, %s, have a cold one on the house :beer:' % ', '.join(welcList))
    welcList = []
    
 def roomChanged(data):
@@ -269,6 +307,11 @@ def roomChanged(data):
       for i in range(len(userList)):
          if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
             bbot.bootUser(userList[i]['userid'],closedMsg)
+   def setPl(data):
+      global botPl
+      botPl = data['list']
+      print 'Bot playlist set!'
+   bbot.playlistAll(setPl)
    newSong(data)
    updateVotes(data)
 
@@ -312,11 +355,32 @@ def uniDesc(s):
          s.replace(s[i],'?')
    return s
 
+def addSnag(speak = True):
+   print '%s  Add song attempt...' % strLT()
+   global addedSong,songId,botPl,songData
+   if addedSong:
+      if speak: bbot.speak(u'Oh I JUST added this one. Good tune though!')
+   else:
+      alreadyInPl = False
+      for i in range(len(botPl)):
+            if songId==botPl[i]['_id']:
+               alreadyInPl = True
+               if speak: bbot.speak('I already have this song!')
+               bbot.vote('up')
+               break
+      if not(alreadyInPl):
+            addedSong = True
+            bbot.playlistAdd(songId,len(botPl))
+            botPl.append(songData)
+            if speak: bbot.speak('Added song...')
+            bbot.vote('up')
+            bbot.snag()
+
 def numEmote(s):
    return s.replace('0',':zero:').replace('1',':one:').replace('2',':two:').replace('3',':three:').replace('4',':four:').replace('5',':five:').replace('6',':six:').replace('7',':seven:').replace('8',':eight:').replace('9',':nine:')
 
 def roomOpen():
-   return strftime('%w',localtime()) == '3' or (int(strftime('%w',localtime()))==4 and int(strftime('%H',localtime()))<6)
+   return ((strftime('%w',localtime()) == '3' or (int(strftime('%w',localtime()))==4 and int(strftime('%H',localtime()))<6))or(strftime('%w',localtime()) == '0' or (int(strftime('%w',localtime()))==1 and int(strftime('%H',localtime()))<6))) and date.today()>=date(2012,9,12)
 
 def strLT(): #string local time
    return strftime('%I:%M:%S %p',localtime())
