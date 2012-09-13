@@ -1,5 +1,3 @@
-#BumBot v3 This bot's account was taken from Backup Ref since CTS didn't want the bot.
-
 from ttapi_with_stop import Bot
 from printnesteddictionary import print_dict
 import re
@@ -334,7 +332,16 @@ def songEnd(data):
    global snags
    md = data['room']['metadata']
    bbot.speak(u'"%s": %s\u25B2, %s\u25BC, %s\u2764' % (md['current_song']['metadata']['song'],str(md['upvotes']),str(md['downvotes']),str(snags)))
-   
+
+def raid(user):
+   raidMsgs = [
+      'RAID!!! AAAH!',
+      'EVERYONE! DRINKS DOWN THE DRAIN! GO! GO! GO!!!',
+      'GLASSES BEHIND THE BAND STAND! NOW!']
+   def sayNext():
+      bbot.speak
+   threading.Timer(
+
 def atName(name):
    if name[0]=='@':
       return name
