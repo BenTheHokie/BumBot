@@ -14,23 +14,24 @@ logger = logging.getLogger("turntable-api")
 
 class Bot:
    def __init__(self, auth, user_id, room_id):
-      self.auth             = auth
-      self.userId           = user_id
-      self.roomId           = room_id
-      self.debug            = False
-      self.callback         = None
-      self.currentDjId      = None
-      self.currentSongId    = None
-      self.lastHeartbeat    = time.time()
-      self.lastActivity     = time.time()
-      self.clientId         = '%s-0.59633534294921572' % time.time()
-      self._msgId           = 0
-      self._cmds            = []
-      self._isConnected     = False
-      self.fanOf            = set()
-      self.currentStatus    = 'available'
-      self.signals          = {}
-
+      self.auth                = auth
+      self.userId              = user_id
+      self.roomId              = room_id
+      self.debug               = False
+      self.callback            = None
+      self.currentDjId         = None
+      self.currentSongId       = None
+      self.lastHeartbeat       = time.time()
+      self.lastActivity        = time.time()
+      self.clientId            = '%s-0.59633534294921572' % time.time()
+      self._msgId              = 0
+      self._cmds               = []
+      self._song_search_cmds   = {}
+      self._isConnected        = False
+      self.fanOf               = set()
+      self.currentStatus       = 'available'
+      self.signals             = {}
+      
       self.connect(self.roomId)
 
 
@@ -43,10 +44,13 @@ class Bot:
          if self.roomId:
             def clb1():
                rq = { 'api': 'room.register', 'roomid': self.roomId }
-               self._send(rq, None)
+               self._send(rq, self.print_data)
             self.callback = clb1
 
       self.whichServer(roomId, clb)
+
+
+   def print_data(self,data): print data
 
 
    def setTmpSong(self, data):
@@ -114,7 +118,7 @@ class Bot:
 
             self._cmds.remove([id, rq, clb])
             break
-
+      #print 'RECEIVED:  %s' % str(obj)
       if obj.get('command') == 'registered':
          self.emit('registered', obj)
       elif obj.get('command') == 'deregistered':
@@ -155,6 +159,9 @@ class Bot:
          self.emit('rem_moderator', obj)
       elif obj.get('command') == 'snagged':
          self.emit('snagged', obj)
+      elif obj.get('command') == 'search_complete':
+         self._song_search_cmds.pop(obj.get('query'))(obj)
+         self.emit('search_complete', obj)
 
 
    def _heartbeat(self, msg):
@@ -162,12 +169,15 @@ class Bot:
       self._msgId += 1
 
 
-   def _send(self, rq, callback=None):
+   def _send(self, rq, callback=None, resultCallback=None):
       rq['msgid']    = self._msgId
       rq['clientid'] = self.clientId
       rq['userid']   = rq.get('userid') or self.userId
       rq['userauth'] = self.auth
-
+      
+      if rq['api']=='file.search':
+         self._song_search_cmds[rq['query']]=resultCallback # Set our dictionary definition so that when we recieve the result, we can look up the query and return it to the callback function
+      #print 'SENT:      %s %s' % (str(rq),self.ws.url)
       msg = json.dumps(rq)
 
       if self.debug:
@@ -184,6 +194,7 @@ class Bot:
       dataStr = urllib2.urlopen('http://turntable.fm:80/api/room.which_chatserver?roomid=%s' % roomId).read()
       data = json.loads(dataStr)
       if data[0]:
+         print data[1]['chatserver'][0]
          callback(data[1]['chatserver'][0], data[1]['chatserver'][1])
       else:
          if self.debug:
@@ -263,8 +274,27 @@ class Bot:
       self._send(rq, callback)
 
 
-   def roomRegister(self):
-      pass
+   def searchSong(self, q, *args):#, page=1, callback=None, resultCallback=None):
+      callback=None
+      page=1
+      resultCallback=None
+      
+      if len(args)==1:
+         args[0]=resultCallback
+      if len(args)==2:
+         if isinstance(args[0],int):
+            page=args[0]
+            resultCallback=args[1]
+         if callable(args[0]):
+            callback=args[0]
+            resultCallback=args[1]
+      if len(args)>=3:
+         page = args[0]
+         callback = args[1]
+         resultCallback = args[2]
+         
+      rq = { 'api': 'file.search', 'query': q, 'page': page}
+      self._send(rq, callback, resultCallback)
 
 
    def roomDeregister(self, callback=None):

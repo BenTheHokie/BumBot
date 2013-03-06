@@ -1,4 +1,6 @@
-from ttapi_with_stop import Bot
+#BumBot v3 This bot's account was taken from Backup Ref since CTS didn't want the bot.
+
+from ttapi import Bot
 from printnesteddictionary import print_dict
 import re
 import random
@@ -39,9 +41,10 @@ djList = []
 botPl=[]
 addedSong=False
 songId=''
-songData={}
-closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays) and this is where I sleep.'
-
+closedMsg = 'Sorry, the speakeasy isn\'t open right now (it opens on Wednesdays and Sundays) and this is where I sleep.'
+raidMsgs = []
+currRaidMsg = 999
+jumpAfter=False
 
 avatars = [{'id':1,'desc':'Brunette girl'},{'id':2,'desc':'Green-haired girl'},{'id':3,'desc':'Red hair pigtails'},{'id':4,'desc':'Blonde chick'},{'id':5,'desc':'Brown mohawk guy'},{'id':6,'desc':'Light brown pigtails'},{'id':7,'desc':'Light brown haired guy'},{'id':8,'desc':'Ginger'},{'id':34,'desc':'African-American kid'},{'id':9,'desc':'Brown bear'},{'id':10,'desc':'Voodoo/Acupuncture bear'},{'id':12,'desc':'Alien bear'},{'id':13,'desc':'Aquamarine bear'},{'id':14,'desc':'Purple bear'},{'id':15,'desc':'Orange bear'},{'id':16,'desc':'Goth bear'},{'id':17,'desc':'Blue bear'},{'id':18,'desc':'Gray mouse/cat'},{'id':19,'desc':'Green mouse/cat'},{'id':121,'desc':'Pink mouse/cat'},{'id':20,'desc':'Blonde superhero'},{'id':21,'desc':'Pink haired superhero'},{'id':22,'desc':'Viking/Devil'},{'id':23,'desc':'Gorilla'},{'id':36,'desc':'Butler monkey'},{'id':37,'desc':'Pink monkey'},{'id':27,'desc':'Ginger space man'},{'id':28,'desc':'Blue-eyed space man'},{'id':29,'desc':'Green glasses space man'},{'id':30,'desc':'Brown haired space kid'},{'id':31,'desc':'African-American space man'},{'id':32,'desc':'Black haired space kid'},{'id':33,'desc':'Blonde space kid'},{'id':218,'desc':'Pink space monkey'},{'id':219,'desc':'Purple space monkey'},{'id':220,'desc':'Red space monkey'},{'id':221,'desc':'Yellow space monkey'},{'id':222,'desc':'Blue alien'},{'id':223,'desc':'Pink alien chick'},{'id':224,'desc':'Green bearded alien'},{'id':225,'desc':'Green monocle alien'},{'id':226,'desc':'Green alien pink hair chick'},{'id':227,'desc':'Ginger alien chick'},{'id':228,'desc':'Purple monocle alien'},{'id':229,'desc':'Purple bearded alien'},{'id':230,'desc':'Redhead chick alien with hat'},{'id':26,'desc':'Superuser robo helmet'},{'id':35,'desc':'Superuser rainbow helmet'},{'id':58,'desc':'Wooooo'}]
 
@@ -56,7 +59,7 @@ def speak(data):
    text = data['text']
    userid = data['userid']
    if re.match('/commands',text.lower()):
-      bbot.speak(u'Current commands: /hey, /roundofbeers, /beer, /menu, /banlist, /coverart, /album, /genre, /bop (score > or = 60%), /lame (score < or = 45%) Mods: BumBot ban *username*, BumBot unban *username*')
+      bbot.speak(u'Current commands: /play, /dive, /hey, /roundofbeers, /beer, /menu, /banlist, /coverart, /album, /genre, /bop (score > or = 60%), /lame (score < or = 45%) Mods: /raid, BumBot ban *username*, BumBot unban *username*')
       
    if re.match('/bo(p|b)',text.lower()):
       if not(alreadyVoted == 1 or alreadyVoted == -1):
@@ -72,7 +75,7 @@ def speak(data):
          if alreadyVoted == 1:
             bbot.vote('up')
          bbot.speak('I already voted!')
-            
+         
    if re.match('/lame',text.lower()):
       if not(alreadyVoted == 1 or alreadyVoted == -1):
          if voteScore <= 45.0:
@@ -84,19 +87,35 @@ def speak(data):
          if alreadyVoted == -1:
             bbot.vote('down')         
          bbot.speak('I already voted!')
+         
+   if text.lower() == '/dive':
+      if songData['djid']==bumbot_userid:
+         bbot.speak('Just after this song.')
+         global jumpAfter
+         jumpAfter=True
+      else:
+         bbot.remDj()
+         
    if text.lower() == '/add':
       def checkMod(data):
          if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
             addSnag()
       bbot.roomInfo(False,checkMod)
+      
+   if re.match('/skip',text.lower()):
+      bbot.stopSong()
+      
    if re.match('/((h(ello|i|ey))|(sup))', strpAcc(text)):
-      bbot.speak('Hey! How are you %s?' % atName(name))
+      bbot.speak('Hey! How are you %s?' % atName(name))   
+   
    if re.match('/round( )?of( )?beer(s)?',text.lower()):
       bbot.speak('Round of %d beers coming right up! Hold on just a minute!' % (len(userList)-1))
       beerTmr = threading.Timer(random.randint(7,20),serveBeers)
       beerTmr.start()
+      
    if re.match('/beer(( )?me)?',text.lower()):
       bbot.speak('%s *gives a :beer: to %s*' % (beerme[random.randint(0,len(beerme)-1)].replace('/name',atName(name)),atName(name)))
+      
    if re.match('/menu(.+)?',text.lower()):
       bbot.speak('Here\'s our menu: :beer::cocktail::sake::coffee::hamburger::spaghetti::ramen::cake::icecream::apple::watermelon::eggplant: and we also have shirley temples for those of you non-drinkers. Lemonade is reserved for the raids.')
 
@@ -121,6 +140,15 @@ def speak(data):
       else:
          bbot.speak("The genre couldn't be identified.")
          
+   if re.match('/setavatar (.+)',text.lower()):
+      def checkMod(data):
+         if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
+            try:
+               bbot.setAvatar(int(text[11:]))
+            except:
+               pass
+      bbot.roomInfo(False,checkMod)
+      
    if re.match('bumbot ban (.+)',text.lower()):
       def checkMod(data):
          if userid in data['room']['metadata']['moderator_id']:
@@ -162,15 +190,26 @@ def speak(data):
                bbot.speak('Couldn\'t remove the user from the ban list.')
       bbot.roomInfo(False,checkMod)
       
+   if (re.match('/raid',text.lower()) or ':cop:' in text.lower()) and not(currRaidMsg<len(raidMsgs)):
+      def getMods(data):
+         if userid in data['room']['metadata']['moderator_id']:
+            raid()
+      bbot.roomInfo(getMods)
+   if re.match('/play',text.lower()):
+      bbot.addDj()
+   if re.match('/jump',text.lower()):
+      bbot.remDj()   
    print(strLT()+'  '+strpAcc(name) + ':'+ ' '*(21-len(strpAcc(name)))+ strpAcc(text))
          
 def newSong(data):
-   global snags,songData,voteScore,alreadyVoted,addedSong
+   global snags,songData,voteScore,alreadyVoted,addedSong,songId
    addedSong=False
    snags = 0
    voteScore = 50
    alreadyVoted = 0
    songData = data['room']['metadata']['current_song']
+   #print 'songData:',songData
+   songId=songData['_id']
    print '%s  %s started playing "%s" by %s' % (strLT(),strpAcc(songData['djname']),strpAcc(songData['metadata']['song']),strpAcc(songData['metadata']['artist']))
    songData['djid'] = data['room']['metadata']['current_dj']
 
@@ -196,7 +235,17 @@ def pmReply(data):
       def checkMod(data):
          if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
             addSnag(False)
-      bbot.roomInfo(False,checkMod)   
+      bbot.roomInfo(False,checkMod)
+   if re.match('/setavatar (.+)',text.lower()):
+      def checkMod(data):
+         if userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid:
+            try:
+               bbot.setAvatar(int(text[11:]))
+            except:
+               pass
+      bbot.roomInfo(False,checkMod)
+   if text.lower()=='/banlist':
+      bbot.pm(str(banlist),userid)
    if userid == lsk_userid:
       if text.lower() == 'unicode':
          print 'Unicode speak test'
@@ -228,13 +277,15 @@ def userReg(data):
       if len(welcList)==0 and not(userid == bumbot_userid):
          wTmr = threading.Timer(5,welcomeUsers) #Welcome users
          wTmr.start()
-      if not(userid == bumbot_userid):
+      if not(userid == bumbot_userid or banned(userid)):
          welcList.append(atName(name))
    else:
       def getMods(data):
          if not(userid in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
             bbot.bootUser(userid,closedMsg)
       bbot.roomInfo(getMods)
+   if banned(userid):
+      bbot.bootUser(userid,'You are banned!')
    if not(userid == bumbot_userid):
       userList.append({'name':data['user'][0]['name'],'userid':data['user'][0]['userid'],'avatarid':data['user'][0]['avatarid'],'laptop':data['user'][0]['laptop']})
       
@@ -248,10 +299,10 @@ def addedDj(data):
       if bumbot_userid==djList[i]['userid']:
          botIsDj = True
          break
-   if len(djList)==1 and not(botIsDj):
-      bbot.addDj()
-   if len(djList)==3 and botIsDj:
-      bbot.remDj()   
+   #if len(djList)==1 and not(botIsDj):
+      #bbot.addDj()
+   #if len(djList)==3 and botIsDj:
+      #bbot.remDj()   
    
 def removedDj(data):
    global djList
@@ -260,15 +311,16 @@ def removedDj(data):
          print '%s  %s has jumped off the DJ stand.' % (strLT(),strpAcc(data['user'][0]['name'])) 
          djList.remove(djList[i])
          break
-   botIsDj = False
-   for i in range(len(djList)):
-      if bumbot_userid==djList[i]['userid']:
-         botIsDj = True
-         break
-   if (len(djList)==1) and not(botIsDj):
-      bbot.addDj()
-   if (len(djList)==1) and botIsDj:
-      bbot.remDj()
+   if not(data['user'][0]['userid']==bumbot_userid or data.has_key('modid')):
+      botIsDj = False
+      for i in range(len(djList)):
+         if bumbot_userid==djList[i]['userid']:
+            botIsDj = True
+            break
+      #if (len(djList)==1) and not(botIsDj):
+         #bbot.addDj()
+      #if (len(djList)==1) and botIsDj:
+         #bbot.remDj()
 
 
 def serveBeers():
@@ -301,13 +353,13 @@ def roomChanged(data):
    print '\n'
    if len(djList)==1:
       bbot.addDj()     
-   if not(roomOpen()):
-      for i in range(len(userList)):
-         if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
-            bbot.bootUser(userList[i]['userid'],closedMsg)
+   #if not(roomOpen()):
+      #for i in range(len(userList)):
+         #if not(userList[i]['userid'] in data['room']['metadata']['moderator_id'] or userid == lsk_userid or userid == bumbot_userid):
+            #bbot.bootUser(userList[i]['userid'],closedMsg)
    def setPl(data):
       global botPl
-      botPl = data['list']
+      botPl=data['list']
       print 'Bot playlist set!'
    bbot.playlistAll(setPl)
    newSong(data)
@@ -318,7 +370,11 @@ def userDereg(data):
    name   = data['user'][0]['name']
    print '%s  %s has left the room. %s' % (strLT(),strpAcc(name),userid)
    for i in range(len(userList)):
-      if userList[i]['userid']==userid: userList.remove(userList[i])
+      if userList[i]['userid']==userid:
+         userList.remove(userList[i])
+         break
+   if len(userList)==1:
+      bbot.remDj()
 
 def updateVotes(data):
    global voteScore
@@ -332,15 +388,28 @@ def songEnd(data):
    global snags
    md = data['room']['metadata']
    bbot.speak(u'"%s": %s\u25B2, %s\u25BC, %s\u2764' % (md['current_song']['metadata']['song'],str(md['upvotes']),str(md['downvotes']),str(snags)))
+   #if jumpAfter==True:
+      #bbot.remDj()
+      #jumpAfter=False
 
-def raid(user):
+def raid(user='o-off-ficerr'):
+   global raidMsgs, currRaidMsg
+   currRaidMsg=0
    raidMsgs = [
       'RAID!!! AAAH!',
       'EVERYONE! DRINKS DOWN THE DRAIN! GO! GO! GO!!!',
-      'GLASSES BEHIND THE BAND STAND! NOW!']
+      'GLASSES BEHIND THE BAND STAND! NOW!',
+      'Lemonade!!!!',
+      'Ok y\'all better sober up real quick!',
+      'H-hey, %s, h-h-oww-w ab-bout a n-n-nice cold-d g-glass of l-l-lemon-n-nade?? :tropical_drink:' % user,
+      'PHEW! That was close!']
    def sayNext():
-      bbot.speak
-   threading.Timer(
+      global currRaidMsg
+      bbot.speak(raidMsgs[currRaidMsg])
+      currRaidMsg+=1
+      if currRaidMsg<len(raidMsgs):
+         threading.Timer(4,sayNext).start()
+   sayNext()
 
 def atName(name):
    if name[0]=='@':
@@ -377,7 +446,7 @@ def addSnag(speak = True):
                break
       if not(alreadyInPl):
             addedSong = True
-            bbot.playlistAdd(songId,len(botPl))
+            bbot.playlistAdd(songId,len(botPl),print_data)
             botPl.append(songData)
             if speak: bbot.speak('Added song...')
             bbot.vote('up')
@@ -391,7 +460,15 @@ def roomOpen():
 
 def strLT(): #string local time
    return strftime('%I:%M:%S %p',localtime())
-   
+
+def banned(userid):
+   for i in range(len(banlist)):
+      if userid == banlist[i]['userid']:
+         return True
+   return False
+
+def print_data(data): print data
+
 def restartWait(retryTime=60):
    threading.Timer(retryTime,restartBegin).start()
    try:
@@ -409,12 +486,13 @@ def restartBegin():
       bbot.connect(speakeasy_id)
       bbot.start()
       bbot.updatePresTmr()
-   except (AttributeError, URLError):
+   except (AttributeError):
       disconnect()
 
 def disconnect(data=None):
    restartWait()
-
+   
+bbot.on('disconnect',disconnect)
 bbot.on('rem_dj',removedDj)
 bbot.on('add_dj',addedDj)
 bbot.on('pmmed',pmReply)
@@ -426,5 +504,4 @@ bbot.on('speak',speak)
 bbot.on('roomChanged',roomChanged)
 bbot.on('registered',userReg)
 bbot.on('update_votes',updateVotes)
-bbot.on('disconnect',disconnect)
 bbot.start()
